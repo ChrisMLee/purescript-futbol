@@ -1,0 +1,14 @@
+{
+  "name": "purescript-futbol",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-halogen": "*",
+    "purescript-affjax": "^4.0.0"
+  }
+}

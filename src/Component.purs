@@ -8,7 +8,8 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
-
+import Control.Monad.Aff.Console (CONSOLE, log)
+import DOM (DOM)
 
 type State =
   { loading :: Boolean
@@ -20,7 +21,14 @@ data Query a
   = SetDate String a
   | MakeRequest a
 
-ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (ajax :: AX.AJAX | eff))
+type AppEffects eff =
+  ( console :: CONSOLE
+  , dom :: DOM
+  , ajax :: AX.AJAX
+  | eff)
+
+
+ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AppEffects eff))
 ui =
   H.component
     { initialState: const initialState
@@ -62,7 +70,7 @@ ui =
               ]
       ]
 
-  eval :: Query ~> H.ComponentDSL State Query Void (Aff (ajax :: AX.AJAX | eff))
+  eval :: Query ~> H.ComponentDSL State Query Void (Aff (AppEffects eff))
   eval = case _ of
     SetDate date next -> do
       H.modify (_ { date = date, result = Nothing :: Maybe String })
@@ -70,6 +78,9 @@ ui =
     MakeRequest next -> do
       date <- H.gets _.date
       H.modify (_ { loading = true })
-      response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/season/2017/2017-08-27/2017-08-27")
+      response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/season/2017/" <> date <> "/" <> date)
+      log' $ response.response
       H.modify (_ { loading = false, result = Just response.response })
       pure next
+
+log' = H.liftAff <<< log

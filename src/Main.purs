@@ -6,9 +6,21 @@ import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Network.HTTP.Affjax as AX
 import Component (ui)
+import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Aff.Console (CONSOLE)
+import Control.Monad.Eff.Ref (REF)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import DOM (DOM)
+
+type AppEffects eff =
+  ( console :: CONSOLE
+  , dom :: DOM
+  , ajax :: AX.AJAX
+  | eff)
 
 -- | Run the app.
-main :: Eff (HA.HalogenEffects (ajax :: AX.AJAX)) Unit
+main ::  forall e. Eff (AppEffects ( avar :: AVAR, ref :: REF, exception :: EXCEPTION| e)
+) Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
   runUI ui unit body

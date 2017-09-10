@@ -1,8 +1,9 @@
-module Component (State, Query(..), ui) where
+module Component (State, Fixtures, Fixture, Query(..), ui, formatDate) where
 
 import Prelude
 import Control.Monad.Aff (Aff)
 import Data.Maybe (Maybe(..))
+import Data.Either (Either(Right, Left))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -10,11 +11,19 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Control.Monad.Aff.Console (CONSOLE, log)
 import DOM (DOM)
+import Data.String (take, drop)
+import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
+import Data.Argonaut.Decode.Combinators ((.?))
+import Data.Argonaut.Parser (jsonParser)
+
+-- Things to put in config file:
+-- season
+-- competitions
 
 type State =
   { loading :: Boolean
   , date :: String
-  , result :: Maybe String
+  , result :: Fixtures
   }
 
 data Query a
@@ -27,7 +36,68 @@ type AppEffects eff =
   , ajax :: AX.AJAX
   | eff)
 
+newtype Link =
+  Link { href :: String }
 
+instance decodeJsonLink :: DecodeJson Link where
+  decodeJson json = do
+    obj <- decodeJson json
+    href <- obj .? "href"
+    pure $ Link { href: href }
+
+newtype Result =
+  Result { goalsHomeTeam :: Number
+         , goalsAwayTeam :: Number
+         }
+
+instance decodeJsonResult :: DecodeJson Result where
+  decodeJson json = do
+    obj <- decodeJson json
+    goalsHomeTeam <- obj .? "goalsHomeTeam"
+    goalsAwayTeam <- obj .? "goalsAwayTeam"
+    pure $ Result { goalsHomeTeam: goalsHomeTeam, goalsAwayTeam: goalsAwayTeam }
+
+newtype LinkGroup =
+  LinkGroup  { self :: Link
+             , competition :: Link
+             , homeTeam:: Link
+             , awayTeam:: Link
+             }
+
+instance decodeJsonLinkGroup :: DecodeJson LinkGroup where
+  decodeJson json = do
+    obj <- decodeJson json
+    self <- obj .? "self"
+    competition <- obj .? "competition"
+    homeTeam <- obj .? "homeTeam"
+    awayTeam <- obj .? "awayTeam"
+    pure $  LinkGroup { self: self, competition: competition, homeTeam: homeTeam, awayTeam: awayTeam }
+
+
+newtype Fixture =
+  Fixture { _links:: LinkGroup
+            , date:: String
+            , status:: String
+            , matchday:: Number
+            , homeTeamName:: String
+            , awayTeamName:: String
+            , result :: Result
+          }
+
+type Fixtures = Array Fixture
+
+instance decodeJsonFixture :: DecodeJson Fixture where
+  decodeJson json = do
+    obj <- decodeJson json
+    _links <- obj .? "_links"
+    date <- obj .? "date"
+    status <- obj .? "status"
+    matchday <- obj .? "matchday"
+    homeTeamName <- obj .? "homeTeamName"
+    awayTeamName <- obj .? "awayTeamName"
+    result <- obj .? "result"
+    pure $ Fixture {_links: _links, date: date, status: status, matchday: matchday, homeTeamName: homeTeamName, awayTeamName: awayTeamName, result: result}
+    
 ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AppEffects eff))
 ui =
   H.component
@@ -39,7 +109,7 @@ ui =
   where
 
   initialState :: State
-  initialState = { loading: false, date: "", result: Nothing }
+  initialState = { loading: false, date: "", result: [] }
 
   render :: State -> H.ComponentHTML Query
   render st =
@@ -60,27 +130,35 @@ ui =
       , HH.p_
           [ HH.text (if st.loading then "Working..." else "") ]
       , HH.div_
-          case st.result of
-            Nothing -> []
-            Just res ->
-              [ HH.h2_
-                  [ HH.text "Response:" ]
-              , HH.pre_
-                  [ HH.code_ [ HH.text res ] ]
-              ]
+          [ HH.h2_
+              [ HH.text "YAAA" ]
+          ]
       ]
 
   eval :: Query ~> H.ComponentDSL State Query Void (Aff (AppEffects eff))
   eval = case _ of
     SetDate date next -> do
-      H.modify (_ { date = date, result = Nothing :: Maybe String })
+      H.modify (_ { date = date, result = [] })
       pure next
     MakeRequest next -> do
       date <- H.gets _.date
       H.modify (_ { loading = true })
-      response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/season/2017/" <> date <> "/" <> date)
+      formattedDate <- pure $ formatDate date
+      response <- H.liftAff $ AX.get ("http://localhost:8080/fixtures/445/2017/" <> formattedDate <> "/" <> formattedDate)
       log' $ response.response
-      H.modify (_ { loading = false, result = Just response.response })
+      let receiveFixtures (Right x) = H.modify (_ { loading = false, result = x })
+          receiveFixtures (Left err) = do
+            log' $ err
+            H.modify (_ { loading = false, result = [] })
+      fixtures <- pure $ jsonParser response.response >>= decodeJson
+      receiveFixtures $ fixtures
       pure next
 
 log' = H.liftAff <<< log
+
+formatDate :: String -> String
+formatDate x = (getYear x) <> "-" <> (getDay x) <> "-" <> (getMonth x) where
+               getYear  = drop 4
+               getMonth = (take 2) <<< (drop 2)
+               getDay   = take 2
+

@@ -2,7 +2,7 @@ module Component (State, Fixtures, Fixture, Query(..), ui, formatDate) where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Either (Either(Right, Left))
 import Halogen as H
 import Halogen.HTML as HH
@@ -15,8 +15,10 @@ import Data.String (take, drop)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Decode.Combinators ((.?))
 import Data.Argonaut.Parser (jsonParser)
+import Data.Array (length, head)
+import Partial.Unsafe (unsafePartial)
 
--- Things to put in config file:
+-- Things to put in config file (monad transformers):
 -- season
 -- competitions
 
@@ -97,7 +99,7 @@ instance decodeJsonFixture :: DecodeJson Fixture where
     awayTeamName <- obj .? "awayTeamName"
     result <- obj .? "result"
     pure $ Fixture {_links: _links, date: date, status: status, matchday: matchday, homeTeamName: homeTeamName, awayTeamName: awayTeamName, result: result}
-    
+
 ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AppEffects eff))
 ui =
   H.component
@@ -130,9 +132,12 @@ ui =
       , HH.p_
           [ HH.text (if st.loading then "Working..." else "") ]
       , HH.div_
-          [ HH.h2_
-              [ HH.text "YAAA" ]
-          ]
+            case length $ st.result of
+              0 ->
+                  [ HH.div_ [HH.text "hi"]]
+              _ ->
+                  -- [ HH.div_ [HH.text "hi"]]
+                  [ HH.div_ [(fixtureComponent $ unsafePartial $ (fromJust $ head st.result))]]
       ]
 
   eval :: Query ~> H.ComponentDSL State Query Void (Aff (AppEffects eff))
@@ -162,3 +167,6 @@ formatDate x = (getYear x) <> "-" <> (getDay x) <> "-" <> (getMonth x) where
                getMonth = (take 2) <<< (drop 2)
                getDay   = take 2
 
+
+fixtureComponent :: forall s p i. Fixture -> H.HTML p i
+fixtureComponent (Fixture f) = HH.text f.homeTeamName

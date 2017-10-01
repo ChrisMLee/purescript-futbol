@@ -10,7 +10,12 @@
   "dependencies": {
     "purescript-halogen": "*",
     "purescript-affjax": "^4.0.0",
-    "purescript-argonaut-core": "^3.1.0"
+    "purescript-argonaut-core": "^3.1.0",
+    "bower": "*",
+    "install": "^1.0.4",
+    "purescript-foreign": "^4.0.1",
+    "purescript-foreign-generic": "^5.0.0",
+    "purescript-lens": "^3.0.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

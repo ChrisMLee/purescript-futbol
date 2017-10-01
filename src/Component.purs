@@ -139,9 +139,11 @@ ui =
               0 ->
                   [ HH.div_ [HH.text "hi"]]
               _ ->
-                  -- [ HH.div_ [HH.text "hi"]]
-                  [(fixtureComponent $ unsafePartial $ (fromJust $ head st.result))]
+                -- [ HH.div_ [HH.text "hi"]]
+                -- (fixtureComponent $ unsafePartial $ (fromJust $ head st.result))
+                [HH.ul_ (map fixtureComponent st.result)]
       ]
+
 
   eval :: Query ~> H.ComponentDSL State Query Void (Aff (AppEffects eff))
   eval = case _ of
@@ -178,7 +180,7 @@ fixtureComponent (Fixture f) = let
                                  awayteam  = f.awayTeamName
                                  awaygoals = show $ round $ f ^. result.._Result..goalsAwayTeam
                                in
-                               HH.div_ [
+                               HH.li_ [
                                          HH.div_ [ HH.text hometeam
                                                  , HH.text homegoals
                                                  ]

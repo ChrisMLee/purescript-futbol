@@ -3,7 +3,7 @@ module Component (State, Fixtures, Fixture, Query(..), ui, formatDate) where
 import Prelude
 import Control.Monad.Aff (Aff)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Either (Either(Right, Left))
+import Data.Either (Either(Right, Left), either)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -13,7 +13,7 @@ import Control.Monad.Aff.Console (CONSOLE, log)
 import DOM (DOM)
 import Data.String (take, drop)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
-import Data.Argonaut.Decode.Combinators ((.?))
+import Data.Argonaut.Decode.Combinators ((.?), (.??))
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (length, head)
 import Partial.Unsafe (unsafePartial)
@@ -51,8 +51,8 @@ instance decodeJsonLink :: DecodeJson Link where
     pure $ Link { href: href }
 
 newtype Result =
-  Result { goalsHomeTeam :: Number
-         , goalsAwayTeam :: Number
+  Result { goalsHomeTeam :: Maybe Number
+         , goalsAwayTeam :: Maybe Number
          }
 
 instance decodeJsonResult :: DecodeJson Result where
@@ -60,7 +60,7 @@ instance decodeJsonResult :: DecodeJson Result where
     obj <- decodeJson json
     goalsHomeTeam <- obj .? "goalsHomeTeam"
     goalsAwayTeam <- obj .? "goalsAwayTeam"
-    pure $ Result { goalsHomeTeam: goalsHomeTeam, goalsAwayTeam: goalsAwayTeam }
+    pure $ Result { goalsHomeTeam, goalsAwayTeam }
 
 newtype LinkGroup =
   LinkGroup  { self :: Link
@@ -173,12 +173,16 @@ formatDate x = (getYear x) <> "-" <> (getDay x) <> "-" <> (getMonth x) where
                getDay   = take 2
 
 
+getScore :: Maybe Number -> String
+getScore Nothing = "Future"
+getScore (Just x) = show $ round $ x
+
 fixtureComponent :: forall s p i. Fixture -> H.HTML p i
 fixtureComponent (Fixture f) = let
                                  hometeam  = f.homeTeamName
-                                 homegoals = show $ round $ f ^. result.._Result..goalsHomeTeam
+                                 homegoals = getScore $ f ^. result.._Result..goalsHomeTeam
                                  awayteam  = f.awayTeamName
-                                 awaygoals = show $ round $ f ^. result.._Result..goalsAwayTeam
+                                 awaygoals = getScore $ f ^. result.._Result..goalsAwayTeam
                                in
                                HH.li_ [
                                          HH.div_ [ HH.text hometeam
@@ -201,7 +205,7 @@ _Link f (Link b) = Link <$> f b
 _LinkGroup :: Lens' LinkGroup {self :: Link, competition :: Link, homeTeam :: Link, awayTeam :: Link}
 _LinkGroup f (LinkGroup b) = LinkGroup <$> f b
 
-_Result :: Lens' Result {goalsHomeTeam :: Number, goalsAwayTeam :: Number}
+_Result :: Lens' Result {goalsHomeTeam :: Maybe Number, goalsAwayTeam :: Maybe Number}
 _Result f (Result b) = Result <$> f b
 
 result :: forall a b r. Lens { result :: a | r } { result :: b | r } a b

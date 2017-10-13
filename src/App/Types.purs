@@ -32,6 +32,9 @@ instance decodeJsonLink :: DecodeJson Link where
     href <- obj .? "href"
     pure $ Link { href: href }
 
+instance showLink :: Show Link where
+  show (Link l) = l.href
+
 newtype Result =
   Result { goalsHomeTeam :: Maybe Number
          , goalsAwayTeam :: Maybe Number
@@ -43,6 +46,16 @@ instance decodeJsonResult :: DecodeJson Result where
     goalsHomeTeam <- obj .? "goalsHomeTeam"
     goalsAwayTeam <- obj .? "goalsAwayTeam"
     pure $ Result { goalsHomeTeam, goalsAwayTeam }
+
+getGoals :: Maybe Number -> String
+getGoals goals =
+  case goals of
+    (Just goals) -> show goals
+    Nothing -> "null"
+
+instance showResult :: Show Result where
+  show (Result r) = "goalsHomeTeam: " <> (getGoals r.goalsHomeTeam) <> ", " <>
+                    "goalsAwayTeam: " <> (getGoals r.goalsAwayTeam)
 
 newtype LinkGroup =
   LinkGroup  { self :: Link
@@ -60,6 +73,11 @@ instance decodeJsonLinkGroup :: DecodeJson LinkGroup where
     awayTeam <- obj .? "awayTeam"
     pure $  LinkGroup { self: self, competition: competition, homeTeam: homeTeam, awayTeam: awayTeam }
 
+instance showLinkGroup :: Show LinkGroup where
+  show (LinkGroup l) = "self: " <> (show l.self) <> ", " <>
+                       "competition: " <> (show l.competition) <> ", " <>
+                       "homeTeam: " <> (show l.homeTeam) <> ", " <>
+                       "awayTeam: " <> (show l.awayTeam)
 
 newtype Fixture =
   Fixture { _links:: LinkGroup
@@ -70,6 +88,15 @@ newtype Fixture =
             , awayTeamName:: String
             , result :: Result
           }
+
+instance showFixture :: Show Fixture where
+  show (Fixture f) = "_links: " <> (show f._links) <> ", " <>
+                     "date: " <> f.date <> ", " <>
+                     "status: " <>f.status <> ", " <>
+                     "matchday: " <> (show f.matchday) <> ", " <>
+                     "homeTeamName: " <> f.homeTeamName <> ", " <>
+                     "awayTeamName;" <> f.awayTeamName <> ", " <>
+                     "result: " <> (show f.result)
 
 type Fixtures = Array Fixture
 

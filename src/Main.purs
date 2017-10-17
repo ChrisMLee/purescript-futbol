@@ -5,7 +5,7 @@ import Control.Monad.Eff (Eff)
 import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
 import Network.HTTP.Affjax as AX
-import Component (ui)
+import ParentComponent (ui)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff.Ref (REF)

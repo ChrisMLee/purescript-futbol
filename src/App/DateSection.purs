@@ -11,19 +11,23 @@ import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import App.Types
 
-type Input = Int
+type Input = Fixtures
 
-type State = Int
+type State = Fixtures
 
-data Query a = HandleInput Int a
+initialState :: State
+initialState = []
+
+data Query a = HandleInput Fixtures a
 
 type DateSectionEff eff = Aff (console :: CONSOLE) eff
 
 component :: forall m. H.Component HH.HTML Query Input Void m
 component =
   H.component
-    { initialState: id
+    { initialState: const initialState
     , render
     , eval
     , receiver: HE.input HandleInput
@@ -39,8 +43,7 @@ component =
 
   eval :: Query ~> H.ComponentDSL State Query Void m
   eval = case _ of
-    HandleInput n next -> do
-      oldN <- H.get
-      when (oldN /= n) $ H.put n
+    HandleInput f next -> do
+      H.put f
       pure next
 

@@ -17,6 +17,10 @@ import Halogen.HTML.Elements.Keyed as HK
 import Halogen.HTML.Events as HE
 import App.Types
 import DateSection as DateSection
+import Network.HTTP.Affjax as AX
+import Data.Either (Either(Right, Left), either)
+import Data.Argonaut.Parser (jsonParser)
+import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -53,7 +57,8 @@ ui = H.lifecycleParentComponent
     HH.div_
       [
         HH.h1_ [ HH.text "YOWZERS" ]
-      , HH.slot (DateSectionSlot) DateSection.component (state.fakeCount) absurd
+      , HH.text (if state.loading then "Working..." else "")
+      , HH.slot (DateSectionSlot) DateSection.component (state.result) absurd
       , HH.button
         [ HE.onClick (HE.input_ Increment) ]
         [ HH.text "+1"]
@@ -62,6 +67,16 @@ ui = H.lifecycleParentComponent
   eval :: Query ~> H.ParentDSL State Query DateSection.Query Slot Void (Aff (AppEffects eff))
   eval (Initialize next) = do
     H.liftAff $ log "Initialize Root"
+    -- TODO: use state monad to pass around configuration
+    H.modify (_ { loading = true })
+    response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
+    H.liftAff $ log response.response
+    let receiveFixtures (Right x) = H.modify (_ { loading = false, result = x })
+        receiveFixtures (Left err) = do
+          H.liftAff $ log err
+          H.modify (_ { loading = false, result = [] })
+    fixtures <- pure $ jsonParser response.response >>= decodeJson
+    receiveFixtures $ fixtures
     pure next
   eval (Finalize next) = do
     pure next

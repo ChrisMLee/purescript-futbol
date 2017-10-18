@@ -16,11 +16,13 @@ import Network.HTTP.Affjax as AX
 import Data.Maybe (Maybe(..))
 import Control.Monad.Aff.Console (CONSOLE, log)
 import DOM (DOM)
+import Control.Monad.Eff.Now (now, NOW)
 
 type AppEffects eff =
   ( console :: CONSOLE
   , dom :: DOM
   , ajax :: AX.AJAX
+  , now :: NOW
   | eff)
 
 newtype Link =

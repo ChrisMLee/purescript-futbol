@@ -24,6 +24,7 @@ import Data.Argonaut.Parser (jsonParser)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.DateTime as DT
 import Control.Monad.Eff.Now (now, NOW)
+import Data.DateTime.Instant (toDateTime)
 
 import DOM (DOM)
 
@@ -74,7 +75,8 @@ ui = H.lifecycleParentComponent
     H.liftAff $ log "Initialize Root"
     -- TODO: use state monad to pass around configuration
     H.modify (_ { loading = true })
-    currentTime <- show <$> (H.liftEff now)
+    currentTime <- toDateTime <$> (H.liftEff now)
+    H.liftAff $ log $ show currentTime
     response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
     H.liftAff $ log response.response
     let receiveFixtures (Right x) = H.modify (_ { loading = false, result = x })

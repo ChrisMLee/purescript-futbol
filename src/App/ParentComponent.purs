@@ -22,9 +22,9 @@ import Network.HTTP.Affjax as AX
 import Data.Either (Either(Right, Left), either)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
-import Data.DateTime as DT
 import Control.Monad.Eff.Now (now, NOW)
-import Data.DateTime.Instant (toDateTime)
+import Data.DateTime.Instant as DTI
+import Data.JSDate as JSD
 
 import DOM (DOM)
 
@@ -75,8 +75,10 @@ ui = H.lifecycleParentComponent
     H.liftAff $ log "Initialize Root"
     -- TODO: use state monad to pass around configuration
     H.modify (_ { loading = true })
-    currentTime <- toDateTime <$> (H.liftEff now)
+    currentTime <- DTI.toDateTime <$> (H.liftEff now)
     H.liftAff $ log $ show currentTime
+    testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
+    H.liftAff $ log $ show $ JSD.toDateTime testTime
     response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
     H.liftAff $ log response.response
     let receiveFixtures (Right x) = H.modify (_ { loading = false, result = x })

@@ -17,12 +17,14 @@ import Data.Maybe (Maybe(..))
 import Control.Monad.Aff.Console (CONSOLE, log)
 import DOM (DOM)
 import Control.Monad.Eff.Now (now, NOW)
+import Data.JSDate (LOCALE)
 
 type AppEffects eff =
   ( console :: CONSOLE
   , dom :: DOM
   , ajax :: AX.AJAX
   , now :: NOW
+  , locale :: LOCALE
   | eff)
 
 newtype Link =

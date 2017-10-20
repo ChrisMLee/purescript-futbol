@@ -12,6 +12,7 @@ import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import DOM (DOM)
 import Control.Monad.Eff.Now (NOW)
+import Data.JSDate (LOCALE)
 
 type AppEffects eff =
   ( console :: CONSOLE
@@ -20,7 +21,7 @@ type AppEffects eff =
   | eff)
 
 -- | Run the app.
-main ::  forall e. Eff (AppEffects ( avar :: AVAR, ref :: REF, exception :: EXCEPTION, now :: NOW| e)
+main ::  forall e. Eff (AppEffects ( avar :: AVAR, ref :: REF, exception :: EXCEPTION, now :: NOW, locale :: LOCALE| e)
 ) Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody

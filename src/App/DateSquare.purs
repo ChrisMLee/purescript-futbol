@@ -7,14 +7,16 @@ import Halogen.HTML as HH
 import Data.DateTime (DateTime)
 import Data.Maybe (Maybe(..))
 import Data.Bifunctor (bimap)
+import Data.Formatter.DateTime (formatDateTime)
+import Data.Either (either)
 
-data DateQuery a
+data DateSquareQuery a
   = SelectDate a
 
-data DateMessage
+data DateSquareMessage
   = NotifySelect
 
-dateSquare :: forall m. DateTime -> H.Component HH.HTML DateQuery Unit DateMessage m
+dateSquare :: forall m. DateTime -> H.Component HH.HTML DateSquareQuery Unit DateSquareMessage m
 dateSquare initialState =
   H.component
     { initialState: const initialState
@@ -24,11 +26,11 @@ dateSquare initialState =
     }
   where
 
-  render :: DateTime -> H.ComponentHTML DateQuery
+  render :: DateTime -> H.ComponentHTML DateSquareQuery
   render d =
-    bimap id id $ HH.h1_ [ HH.text "Standin Date" ]
+    bimap id id $ HH.li_ [ HH.text (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d) ]
 
-  eval :: DateQuery ~> H.ComponentDSL DateTime DateQuery DateMessage m
+  eval :: DateSquareQuery ~> H.ComponentDSL DateTime DateSquareQuery DateSquareMessage m
   eval (SelectDate next) = do
     H.raise NotifySelect
     pure next

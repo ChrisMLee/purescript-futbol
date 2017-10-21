@@ -18,15 +18,25 @@ import App.Lenses
 import Data.DateTime (DateTime)
 import Data.JSDate as JSD
 import Partial.Unsafe (unsafePartial)
+import Data.Traversable (sequence)
+import Component.DateSquare (DateSquareQuery(..), DateSquareMessage(..), dateSquare)
+
+data DateSquareSlot = DateSquareSlot
+derive instance eqDateSquareSlot :: Eq DateSquareSlot
+derive instance ordDateSquareSlot :: Ord DateSquareSlot
 
 type Input = Fixtures
 
-type State = Fixtures
+type State = Array DateTime
+
 
 initialState :: State
 initialState = []
 
-data Query a = HandleInput Fixtures a
+data Query a
+  =
+    HandleInput Fixtures a
+  | HandleDateSquareMessage DateTime DateSquareMessage a
 
 type DateSectionEff eff = Aff (console :: CONSOLE) eff
 
@@ -41,7 +51,7 @@ fixtureDates fixtures = foldr grabDate [] fixtures where
 
 component :: forall eff. H.Component HH.HTML Query Input Void (Aff (AppEffects eff))
 component =
-  H.component
+  H.parentComponent
     { initialState: const initialState
     , render
     , eval
@@ -49,16 +59,35 @@ component =
     }
   where
 
-  render :: State -> H.ComponentHTML Query
+  render :: State -> H.ParentHTML Query DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
   render state =
     HH.div_
       [ HH.text "My input value is:"
-      , HH.strong_ [ HH.text (show $ fixtureDates state) ]
+      , HH.ul_ (map renderDateSquare state)
       ]
 
-  eval :: Query ~> H.ComponentDSL State Query Void (Aff (AppEffects eff))
+  renderDateSquare :: DateTime -> H.ParentHTML Query DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
+  renderDateSquare dateTime =
+    HH.slot
+      DateSquareSlot
+      (dateSquare dateTime)
+      unit
+      (HE.input (HandleDateSquareMessage dateTime))
+
+  eval :: Query ~> H.ParentDSL State Query DateSquareQuery DateSquareSlot Void (Aff (AppEffects eff))
   eval = case _ of
     HandleInput f next -> do
-      H.put f
+      fd <- H.liftAff $ sequence $ map makeDateTime $ (fixtureDates f)
+      H.liftAff $ log $ show fd
+      H.put fd
       pure next
+    HandleDateSquareMessage p msg next -> do
+      case msg of
+        NotifySelect -> do
+          H.liftAff $ log $ "hi"
+          -- wasComplete <- H.query (TaskSlot p) (H.request IsCompleted)
+          -- when (fromMaybe false wasComplete) $ H.modify $ updateNumCompleted (_ `sub` 1)
+          -- H.modify (removeTask p)
+      pure next
+
 

@@ -1,27 +1,30 @@
 module DateSection where
 
+import App.Lenses
+import App.Types
+import Data.Time
 import Prelude
 
+import Component.DateSquare (DateSquareQuery(..), DateSquareMessage(..), dateSquare)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Console (CONSOLE)
+import Data.Array (cons, nub)
+import Data.DateTime (DateTime, modifyTime, setHour, setMillisecond, setMinute, setSecond)
+import Data.Enum (toEnum)
+import Data.Foldable (foldr)
+import Data.JSDate as JSD
 import Data.Maybe (Maybe(..), fromJust)
+import Data.Traversable (sequence)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Data.Array (cons, nub)
-import Data.Foldable (foldr)
-import App.Types
-import App.Lenses
-import Data.DateTime (DateTime)
-import Data.JSDate as JSD
 import Partial.Unsafe (unsafePartial)
-import Data.Traversable (sequence)
-import Component.DateSquare (DateSquareQuery(..), DateSquareMessage(..), dateSquare)
 
-data DateSquareSlot = DateSquareSlot
+-- this is how you prevent duplicate slot addresses
+newtype DateSquareSlot = DateSquareSlot DateTime
 derive instance eqDateSquareSlot :: Eq DateSquareSlot
 derive instance ordDateSquareSlot :: Ord DateSquareSlot
 
@@ -40,6 +43,13 @@ data Query a
 
 type DateSectionEff eff = Aff (console :: CONSOLE) eff
 
+zeroOutTime :: Time -> Time
+zeroOutTime = setHour h <<< setMinute m <<< setSecond s <<< setMillisecond ms where
+                  h = unsafePartial $ fromJust $ toEnum 0
+                  m = unsafePartial $ fromJust $ toEnum 0
+                  s = unsafePartial $ fromJust $ toEnum 0
+                  ms = unsafePartial $ fromJust $ toEnum 0
+
 makeDateTime :: forall eff. String -> (Aff (AppEffects eff)) DateTime
 makeDateTime s = do
   parsed <- liftEff $ JSD.parse s
@@ -47,7 +57,7 @@ makeDateTime s = do
 
 fixtureDates :: Fixtures -> Array String
 fixtureDates fixtures = foldr grabDate [] fixtures where
-                          grabDate (Fixture f) acc = nub $ cons f.date acc
+                          grabDate (Fixture f) acc = cons f.date acc
 
 component :: forall eff. H.Component HH.HTML Query Input Void (Aff (AppEffects eff))
 component =
@@ -62,14 +72,12 @@ component =
   render :: State -> H.ParentHTML Query DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
   render state =
     HH.div_
-      [ HH.text "My input value is:"
-      , HH.ul_ (map renderDateSquare state)
-      ]
+      [ HH.ul_ (map renderDateSquare state) ]
 
   renderDateSquare :: DateTime -> H.ParentHTML Query DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
   renderDateSquare dateTime =
     HH.slot
-      DateSquareSlot
+      (DateSquareSlot dateTime)
       (dateSquare dateTime)
       unit
       (HE.input (HandleDateSquareMessage dateTime))
@@ -77,9 +85,11 @@ component =
   eval :: Query ~> H.ParentDSL State Query DateSquareQuery DateSquareSlot Void (Aff (AppEffects eff))
   eval = case _ of
     HandleInput f next -> do
-      fd <- H.liftAff $ sequence $ map makeDateTime $ (fixtureDates f)
-      H.liftAff $ log $ show fd
-      H.put fd
+      H.liftAff $ log $ show $ nub $ fixtureDates f
+      fd <- H.liftAff $ (sequence $ map makeDateTime $ (fixtureDates f))
+      ud <- pure $ nub $ (map (modifyTime zeroOutTime) fd)
+      H.liftAff $ log $ show $ ud
+      H.put ud
       pure next
     HandleDateSquareMessage p msg next -> do
       case msg of

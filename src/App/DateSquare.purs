@@ -9,6 +9,8 @@ import Data.Maybe (Maybe(..))
 import Data.Bifunctor (bimap)
 import Data.Formatter.DateTime (formatDateTime)
 import Data.Either (either)
+import Halogen.HTML.CSS (style)
+import CSS
 
 data DateSquareQuery a
   = SelectDate a
@@ -28,7 +30,8 @@ dateSquare initialState =
 
   render :: DateTime -> H.ComponentHTML DateSquareQuery
   render d =
-    bimap id id $ HH.li_ [ HH.text (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d) ]
+    bimap id id $ HH.li [ style do color red]
+                   [ HH.text (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d) ]
 
   eval :: DateSquareQuery ~> H.ComponentDSL DateTime DateSquareQuery DateSquareMessage m
   eval (SelectDate next) = do

@@ -25,8 +25,9 @@ import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Control.Monad.Eff.Now (now, NOW)
 import Data.DateTime.Instant as DTI
 import Data.JSDate as JSD
-
+import Data.DateTime (DateTime)
 import DOM (DOM)
+import Data.Formatter.DateTime (formatDateTime)
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -34,13 +35,13 @@ derive instance ordDateSectionSlot :: Ord Slot
 
 type State =
   { loading :: Boolean
-  , date :: String
+  , date :: Maybe DateTime
   , result :: Fixtures
   , fakeCount :: Int
   }
 
 initialState :: State
-initialState = { loading: false, date: "", result: [], fakeCount: 0 }
+initialState = { loading: false, date: Nothing, result: [], fakeCount: 0 }
 
 data Query a
   = Initialize a
@@ -62,7 +63,10 @@ ui = H.lifecycleParentComponent
   render state =
     HH.div_
       [
-        HH.h1_ [ HH.text "YOWZERS" ]
+        HH.h1_ [ HH.text "Fixtures" ]
+      , HH.text case state.date of
+                  Nothing -> "No date loaded"
+                  (Just d) -> (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d)
       , HH.text (if state.loading then "Working..." else "")
       , HH.slot (DateSectionSlot) DateSection.component (state.result) absurd
       , HH.button
@@ -76,9 +80,10 @@ ui = H.lifecycleParentComponent
     -- TODO: use state monad to pass around configuration
     H.modify (_ { loading = true })
     currentTime <- DTI.toDateTime <$> (H.liftEff now)
+    H.modify (_ {date = Just currentTime})
     H.liftAff $ log $ show currentTime
-    testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
-    H.liftAff $ log $ show $ JSD.toDateTime testTime
+    -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
+    -- H.liftAff $ log $ show $ JSD.toDateTime testTime
     response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
     H.liftAff $ log response.response
     let receiveFixtures (Right x) = H.modify (_ { loading = false, result = x })

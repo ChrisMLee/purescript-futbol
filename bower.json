@@ -23,7 +23,10 @@
     "purescript-now": "^3.0.0",
     "purescript-js-date": "^5.1.0",
     "purescript-foldable-traversable": "^3.6.1",
-    "purescript-formatters": "^3.0.0"
+    "purescript-formatters": "^3.0.0",
+    "purescript-enums": "^3.2.1",
+    "purescript-halogen-css": "^6.0.0",
+    "purescript-css": "^3.3.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

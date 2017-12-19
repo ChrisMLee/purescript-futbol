@@ -3,9 +3,9 @@ module DateSection where
 import App.Lenses
 import App.Types
 import CSS.Display
-import Data.Time
 import Prelude
 
+import App.Helpers (fixtureDates, makeDateTime, zeroOutTime)
 import Component.DateSquare (DateSquareQuery(..), DateSquareMessage(..), dateSquare)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
@@ -16,7 +16,6 @@ import Data.Array (cons, nub)
 import Data.DateTime (DateTime(..), modifyTime, setHour, setMillisecond, setMinute, setSecond)
 import Data.Enum (toEnum)
 import Data.Foldable (foldr)
-import Data.JSDate as JSD
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (sequence)
 import Halogen as H
@@ -46,22 +45,6 @@ data DateSectionQuery a
 data DateSectionMessage =
   NotifyDateSelect DateTime
 
-zeroOutTime :: Time -> Time
-zeroOutTime = setHour h <<< setMinute m <<< setSecond s <<< setMillisecond ms where
-                  h = unsafePartial $ fromJust $ toEnum 0
-                  m = unsafePartial $ fromJust $ toEnum 0
-                  s = unsafePartial $ fromJust $ toEnum 0
-                  ms = unsafePartial $ fromJust $ toEnum 0
-
-makeDateTime :: forall eff. String -> (Aff (AppEffects eff)) DateTime
-makeDateTime s = do
-  parsed <- liftEff $ JSD.parse s
-  pure $ unsafePartial $ fromJust $ JSD.toDateTime parsed
-
-fixtureDates :: Fixtures -> Array String
-fixtureDates fixtures = foldr grabDate [] fixtures where
-                          grabDate (Fixture f) acc = cons f.date acc
-
 dateSection :: forall eff. H.Component HH.HTML DateSectionQuery Input DateSectionMessage (Aff (AppEffects eff))
 dateSection =
   H.parentComponent
@@ -88,10 +71,10 @@ dateSection =
   eval :: DateSectionQuery ~> H.ParentDSL State DateSectionQuery DateSquareQuery DateSquareSlot DateSectionMessage (Aff (AppEffects eff))
   eval = case _ of
     HandleInput f next -> do
-      H.liftAff $ log $ show $ nub $ fixtureDates f
+      -- H.liftAff $ log $ show $ nub $ fixtureDates f
       fd <- H.liftAff $ (sequence $ map makeDateTime $ (fixtureDates f))
       ud <- pure $ nub $ (map (modifyTime zeroOutTime) fd)
-      H.liftAff $ log $ show $ ud
+      -- H.liftAff $ log $ show $ ud
       H.put ud
       pure next
     HandleDateSquareMessage p msg next -> do

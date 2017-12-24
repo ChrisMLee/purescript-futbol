@@ -17,7 +17,7 @@ import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (filter, head, length, nub, reverse, snoc, sortBy)
 import Data.Combinators (on)
-import Data.DateTime (DateTime(..), diff, modifyTime)
+import Data.DateTime (DateTime(..), diff, millisecond, modifyTime, date)
 import Data.DateTime.Instant as DTI
 import Data.Either (Either(Right, Left), either)
 import Data.Foldable (foldr)
@@ -103,15 +103,15 @@ ui = H.lifecycleParentComponent
       H.modify (_ {date = Just currentTime})
       H.liftAff $ log $ show currentTime
       -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
-      -- H.liftAff $ log $ show $ JSD.toDateTime testTime
+      -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
       response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
       -- H.liftAff $ log response.response
       let receiveFixtures (Right x) = do
             filteredDates <- H.liftAff $ (sequence $ map makeDateTime $ (fixtureDates x))
             uniqueDates <- pure $ nub $ (map (modifyTime zeroOutTime) filteredDates)
-            cd <- pure $ closestDate currentTime uniqueDates
-            H.liftAff $ log $ show $ closestDate currentTime uniqueDates
-            H.modify (_ { loading = false, result = x, selectedDate = Just currentTime })
+            cd <- pure $ snd $ unsafePartial $ fromJust $ closestDate currentTime uniqueDates
+            H.liftAff $ log $ "closest:" <> ( show $ closestDate currentTime uniqueDates )
+            H.modify (_ { loading = false, result = x, selectedDate = Just cd })
           receiveFixtures (Left err) = do
             H.liftAff $ log err
             H.modify (_ { loading = false, result = [] })
@@ -149,18 +149,26 @@ fixtureComponent (Fixture f) = let
 
 closestDate :: DateTime -> Array DateTime -> Maybe DiffDate
 closestDate givenDate [] = Nothing
-closestDate givenDate xs = foldr returnClosest Nothing s where
+closestDate givenDate xs = head s where
                            s :: Array DiffDate
-                           s = mySort $ (map (\x -> getDiffDate givenDate x) xs)
-                           returnClosest :: DiffDate -> Maybe DiffDate -> Maybe DiffDate
-                           returnClosest d Nothing = Just d
-                           returnClosest d acc = if (absMilliseconds $ fst d) < (absMilliseconds $ fst (unsafePartial $ fromJust acc)) then Just d else acc
+                           s = mySort $ filter (\x -> fst x > Milliseconds 0.0) $ (map (\x -> getDiffDate givenDate x) xs)
 
 -- mySort :: forall b. Ord b => [(a, b)] -> [(a, b)]
-mySort = sortBy (flip compare `on` fst)
+mySort = sortBy (compare `on` fst)
 
 absMilliseconds :: Milliseconds -> Milliseconds
 absMilliseconds = over Milliseconds abs
+
+-- filterFixturesByDate :: forall eff. Eff (locale :: JSD.LOCALE | eff) Fixtures -> DateTime -> Fixtures
+-- filterFixturesByDate fs d = do
+--                             filter matchesDate fs where
+--                             matchesDate :: Fixture -> DateTime -> Boolean
+--                             matchesDate (Fixture f) d = do
+--                               parsed = JSD.parse f.date
+                              
+--                               (date $ unsafePartial $ fromJust $ JSD.toDateTime $ JSD.parse f.date) == (date d)
+
+
 
   -- do
   --                          -- coolest <- pure givenDate
@@ -171,7 +179,7 @@ absMilliseconds = over Milliseconds abs
 type DiffDate = Tuple Milliseconds DateTime
 
 getDiffDate :: DateTime -> DateTime -> DiffDate
-getDiffDate d d' = Tuple (diff d d') (d')
+getDiffDate d d' = Tuple (diff d' d) (d')
 
 -- [(diff, dateTime)]
 

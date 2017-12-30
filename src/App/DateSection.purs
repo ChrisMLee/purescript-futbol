@@ -72,7 +72,7 @@ dateSection =
   eval = case _ of
     HandleInput f next -> do
       -- H.liftAff $ log $ show $ nub $ fixtureDates f
-      fd <- H.liftAff $ (sequence $ map makeDateTime $ (fixtureDates f))
+      fd <- pure $ fixtureDates f
       ud <- pure $ nub $ (map (modifyTime zeroOutTime) fd)
       -- H.liftAff $ log $ show $ ud
       H.put ud

@@ -15,15 +15,19 @@ import Control.Monad.Eff.Now (now, NOW)
 import DOM (DOM)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Parser (jsonParser)
-import Data.Array (filter, head, length, nub, reverse, snoc, sortBy)
+import Data.Array (filter, filterA, head, length, nub, reverse, snoc, sortBy, zip)
+import Data.Bifunctor (lmap)
 import Data.Combinators (on)
-import Data.DateTime (DateTime(..), diff, millisecond, modifyTime, date)
+import Data.DateTime (DateTime(..), date, diff, millisecond, modifyTime)
 import Data.DateTime.Instant as DTI
 import Data.Either (Either(Right, Left), either)
 import Data.Foldable (foldr)
-import Data.Formatter.DateTime as DFDT
+import Data.Foreign (ForeignError(..))
+import Data.Formatter.DateTime (Formatter, FormatterCommand(YearFull), format, formatDateTime, unformat)
+import Data.Formatter.Parser.Interval (extendedDateTimeFormatInUTC)
 import Data.Int (round)
 import Data.JSDate as JSD
+import Data.List (List(Nil), (:))
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Newtype (over)
 import Data.Time.Duration (class Duration, Milliseconds(..), fromDuration)
@@ -78,11 +82,11 @@ ui = H.lifecycleParentComponent
       , HH.div_
           case state.date of
             Nothing -> [HH.text  "No date loaded"]
-            (Just d) -> [HH.text ("date: " <> (either (\err -> "Error parsing date: " <> err) id $ DFDT.formatDateTime "ddd MMM D" d))]
+            (Just d) -> [HH.text ("date: " <> (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d))]
       , HH.div_
           case state.selectedDate of
             Nothing -> [HH.text "No date selected"]
-            (Just d) -> [HH.text ("selected date: " <>(either (\err -> "Error parsing date: " <> err) id $ DFDT.formatDateTime "ddd MMM D" d))]
+            (Just d) -> [HH.text ("selected date: " <>(either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d))]
       , HH.text (if state.loading then "Working..." else "")
       , HH.slot (DateSectionSlot) dateSection (state.result) (HE.input HandleDateSectionMessage)
       , HH.div_
@@ -90,7 +94,7 @@ ui = H.lifecycleParentComponent
           0 ->
             [ HH.div_ [HH.text "No Fixtures"]]
           _ ->
-            [HH.ul_ (map fixtureComponent state.result)]
+            [HH.ul_ (map fixtureComponent (filterFixturesByDate (unsafePartial $ fromJust $ state.selectedDate) state.result))]
       ]
 
   eval :: Query ~> H.ParentDSL State Query DateSectionQuery Slot Void (Aff (AppEffects eff))
@@ -101,13 +105,15 @@ ui = H.lifecycleParentComponent
       H.modify (_ { loading = true })
       currentTime <- DTI.toDateTime <$> (H.liftEff now)
       H.modify (_ {date = Just currentTime})
-      H.liftAff $ log $ show currentTime
+      -- H.liftAff $ log $ show currentTime
+      parsedWithFormatter <- pure $ unformat extendedDateTimeFormatInUTC "2017-08-12T14:00:00Z"
+      H.liftAff $ log $ show $ parsedWithFormatter
       -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
       -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
       response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
       -- H.liftAff $ log response.response
       let receiveFixtures (Right x) = do
-            filteredDates <- H.liftAff $ (sequence $ map makeDateTime $ (fixtureDates x))
+            filteredDates <- pure $ fixtureDates x
             uniqueDates <- pure $ nub $ (map (modifyTime zeroOutTime) filteredDates)
             cd <- pure $ snd $ unsafePartial $ fromJust $ closestDate currentTime uniqueDates
             H.liftAff $ log $ "closest:" <> ( show $ closestDate currentTime uniqueDates )
@@ -126,6 +132,12 @@ ui = H.lifecycleParentComponent
           H.liftAff $ log $ show $ d
           H.modify (_ { selectedDate = Just d })
       pure next
+
+-- 2017-08-12T14:00:00Z
+myDateFormat :: Formatter
+myDateFormat
+  = YearFull :
+    Nil
 
 getScore :: Maybe Number -> String
 getScore Nothing = "Future"
@@ -151,7 +163,7 @@ closestDate :: DateTime -> Array DateTime -> Maybe DiffDate
 closestDate givenDate [] = Nothing
 closestDate givenDate xs = head s where
                            s :: Array DiffDate
-                           s = mySort $ filter (\x -> fst x > Milliseconds 0.0) $ (map (\x -> getDiffDate givenDate x) xs)
+                           s = mySort $ filter (\x -> fst x >= Milliseconds 0.0) $ (map (\x -> getDiffDate givenDate x) xs)
 
 -- mySort :: forall b. Ord b => [(a, b)] -> [(a, b)]
 mySort = sortBy (compare `on` fst)
@@ -159,14 +171,23 @@ mySort = sortBy (compare `on` fst)
 absMilliseconds :: Milliseconds -> Milliseconds
 absMilliseconds = over Milliseconds abs
 
--- filterFixturesByDate :: forall eff. Eff (locale :: JSD.LOCALE | eff) Fixtures -> DateTime -> Fixtures
--- filterFixturesByDate fs d = do
---                             filter matchesDate fs where
---                             matchesDate :: Fixture -> DateTime -> Boolean
---                             matchesDate (Fixture f) d = do
---                               parsed = JSD.parse f.date
-                              
---                               (date $ unsafePartial $ fromJust $ JSD.toDateTime $ JSD.parse f.date) == (date d)
+
+-- via @kritzcreek
+-- You can use `filterA` from Data.Array, or `filterM` from Data.List, or some version of the `wither` generalization from purescript-filterable
+-- one thing that you should know/understand, is that you cannot "lose" the effectiness of Eff. `Eff (asd :: ASD) Boolean -> Boolean` does not exist as a safe and sound function
+
+filterFixturesByDate :: DateTime -> Fixtures -> Fixtures
+filterFixturesByDate d fs = filter (\f -> matchesDate d f) fs where
+                            matchesDate :: DateTime -> Fixture -> Boolean
+                            matchesDate d (Fixture f) = date f.date == date d
+
+-- filterFixturesByDate :: forall eff. Fixtures -> DateTime -> Eff (locale :: JSD.LOCALE | eff) Fixtures
+-- filterFixturesByDate fs d = filterA (\f -> matchesDate d f) fs where
+--                             matchesDate :: forall eff. DateTime -> Fixture -> Eff (locale :: JSD.LOCALE | eff) Boolean
+--                             matchesDate d (Fixture f) = do
+--                               parsed <- JSD.parse f.date
+--                               dt <- pure $ unsafePartial $ fromJust $ JSD.toDateTime parsed
+--                               pure $ (date $ dt) == (date d)
 
 
 

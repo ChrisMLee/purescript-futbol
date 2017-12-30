@@ -12,10 +12,11 @@ import Prelude
 import Optic.Core
 import App.Types
 import Data.Maybe (Maybe(..))
+import Data.DateTime (DateTime(..))
 
 -- Lenses
 
-_Fixture :: Lens' Fixture {_links:: LinkGroup, date :: String, status :: String, matchday :: Number, homeTeamName :: String, awayTeamName :: String, result:: Result}
+_Fixture :: Lens' Fixture {_links:: LinkGroup, date :: DateTime, status :: String, matchday :: Number, homeTeamName :: String, awayTeamName :: String, result:: Result}
 _Fixture f (Fixture b) = Fixture <$> f b
 
 _Link :: Lens' Link { href :: String}

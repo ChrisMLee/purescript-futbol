@@ -8,16 +8,20 @@ module App.Types
   ) where
 
 import Prelude
+
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.Console (CONSOLE, log)
+import Control.Monad.Eff.Now (now, NOW)
+import DOM (DOM)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Decode.Combinators ((.?), (.??))
 import Data.Argonaut.Parser (jsonParser)
-import Control.Monad.Aff (Aff)
-import Network.HTTP.Affjax as AX
-import Data.Maybe (Maybe(..))
-import Control.Monad.Aff.Console (CONSOLE, log)
-import DOM (DOM)
-import Control.Monad.Eff.Now (now, NOW)
+import Data.DateTime (DateTime(..))
+import Data.Formatter.DateTime (Formatter, format, formatDateTime, unformat)
+import Data.Formatter.Parser.Interval (extendedDateTimeFormatInUTC)
 import Data.JSDate (LOCALE)
+import Data.Maybe (Maybe(..))
+import Network.HTTP.Affjax as AX
 
 type AppEffects eff =
   ( console :: CONSOLE
@@ -85,7 +89,7 @@ instance showLinkGroup :: Show LinkGroup where
 
 newtype Fixture =
   Fixture { _links:: LinkGroup
-            , date:: String
+            , date:: DateTime
             , status:: String
             , matchday:: Number
             , homeTeamName:: String
@@ -95,7 +99,7 @@ newtype Fixture =
 
 instance showFixture :: Show Fixture where
   show (Fixture f) = "_links: " <> (show f._links) <> ", " <>
-                     "date: " <> f.date <> ", " <>
+                     "date: " <> (show f.date) <> ", " <>
                      "status: " <>f.status <> ", " <>
                      "matchday: " <> (show f.matchday) <> ", " <>
                      "homeTeamName: " <> f.homeTeamName <> ", " <>
@@ -108,7 +112,8 @@ instance decodeJsonFixture :: DecodeJson Fixture where
   decodeJson json = do
     obj <- decodeJson json
     _links <- obj .? "_links"
-    date <- obj .? "date"
+    rawDate <- obj .? "date"
+    date <- unformat extendedDateTimeFormatInUTC rawDate
     status <- obj .? "status"
     matchday <- obj .? "matchday"
     homeTeamName <- obj .? "homeTeamName"

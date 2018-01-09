@@ -29,7 +29,6 @@ import Data.Int (round)
 import Data.JSDate as JSD
 import Data.List (List(Nil), (:))
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
-import Data.Newtype (over)
 import Data.Time.Duration (class Duration, Milliseconds(..), fromDuration)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), snd, fst)
@@ -42,6 +41,8 @@ import Halogen.HTML.Events as HE
 import Math (abs)
 import Network.HTTP.Affjax as AX
 import Partial.Unsafe (unsafePartial)
+import Halogen.HTML.Properties as HP
+import Data.Newtype (class Newtype, unwrap, wrap, over)
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -76,7 +77,8 @@ ui = H.lifecycleParentComponent
 
   render :: State -> H.ParentHTML Query DateSectionQuery Slot (Aff (AppEffects eff))
   render state =
-    HH.div_
+    HH.div
+      [ HP.class_ $ wrap "Parent-container" ]
       [
         HH.h1_ [ HH.text "Fixtures" ]
       , HH.div_

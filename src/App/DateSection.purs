@@ -23,6 +23,8 @@ import Halogen.HTML as HH
 import Halogen.HTML.CSS (style)
 import Halogen.HTML.Events as HE
 import Partial.Unsafe (unsafePartial)
+import Halogen.HTML.Properties as HP
+import Data.Newtype (wrap)
 
 -- this is how you prevent duplicate slot addresses
 newtype DateSquareSlot = DateSquareSlot DateTime
@@ -58,7 +60,7 @@ dateSection =
   render :: State -> H.ParentHTML DateSectionQuery DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
   render state =
     HH.div_
-      [ HH.ul [style $ do display flex] (map renderDateSquare state) ]
+      [ HH.ul [ HP.class_ $ wrap "DateSection-container" ] (map renderDateSquare state) ]
 
   renderDateSquare :: DateTime -> H.ParentHTML DateSectionQuery DateSquareQuery DateSquareSlot (Aff (AppEffects eff))
   renderDateSquare dateTime =

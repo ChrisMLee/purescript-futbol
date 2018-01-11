@@ -43,6 +43,8 @@ import Network.HTTP.Affjax as AX
 import Partial.Unsafe (unsafePartial)
 import Halogen.HTML.Properties as HP
 import Data.Newtype (class Newtype, unwrap, wrap, over)
+import Data.HTTP.Method (Method(..))
+import Network.HTTP.RequestHeader (RequestHeader(..))
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -110,6 +112,8 @@ ui = H.lifecycleParentComponent
       -- H.liftAff $ log $ show currentTime
       parsedWithFormatter <- pure $ unformat extendedDateTimeFormatInUTC "2017-08-12T14:00:00Z"
       H.liftAff $ log $ show $ parsedWithFormatter
+      noice <- H.liftAff $ AX.affjax $ AX.defaultRequest { url = "http://api.football-data.org/v1/competitions/445/teams", method = Left GET, headers = [(RequestHeader "X-Auth-Token" "use reader here!")] }
+      H.liftAff $ log noice.response
       -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
       -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
       response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")

@@ -1,5 +1,6 @@
 module App.Types
   ( AppEffects
+  , SomeEffects
   , Link (..)
   , Result (..)
   , LinkGroup (..)
@@ -30,6 +31,14 @@ type AppEffects eff =
   , now :: NOW
   , locale :: LOCALE
   | eff)
+
+type SomeEffects =
+  ( console :: CONSOLE
+  , ajax :: AX.AJAX
+  , now :: NOW
+  , locale :: LOCALE
+  )
+
 
 newtype Link =
   Link { href :: String }

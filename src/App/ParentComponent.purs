@@ -5,12 +5,13 @@ import App.Types
 import Optic.Core
 import Prelude
 
+import App.Control.Monad (Futbol)
 import App.Helpers (fixtureDates, makeDateTime, zeroOutTime)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Console (CONSOLE, logShow)
+import Control.Monad.Eff.Console as C
 import Control.Monad.Eff.Now (now, NOW)
 import DOM (DOM)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
@@ -25,10 +26,12 @@ import Data.Foldable (foldr)
 import Data.Foreign (ForeignError(..))
 import Data.Formatter.DateTime (Formatter, FormatterCommand(YearFull), format, formatDateTime, unformat)
 import Data.Formatter.Parser.Interval (extendedDateTimeFormatInUTC)
+import Data.HTTP.Method (Method(..))
 import Data.Int (round)
 import Data.JSDate as JSD
 import Data.List (List(Nil), (:))
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Newtype (class Newtype, unwrap, wrap, over)
 import Data.Time.Duration (class Duration, Milliseconds(..), fromDuration)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), snd, fst)
@@ -38,13 +41,12 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Elements.Keyed as HK
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Math (abs)
 import Network.HTTP.Affjax as AX
-import Partial.Unsafe (unsafePartial)
-import Halogen.HTML.Properties as HP
-import Data.Newtype (class Newtype, unwrap, wrap, over)
-import Data.HTTP.Method (Method(..))
 import Network.HTTP.RequestHeader (RequestHeader(..))
+import Partial.Unsafe (unsafePartial)
+import Control.Monad.Free (liftF)
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -66,7 +68,7 @@ data Query a
   | HandleDateSectionMessage DateSectionMessage a
 
 
-ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AppEffects eff))
+ui :: H.Component HH.HTML Query Unit Void Futbol
 ui = H.lifecycleParentComponent
   { initialState: const initialState
   , render
@@ -77,65 +79,51 @@ ui = H.lifecycleParentComponent
   }
   where
 
-  render :: State -> H.ParentHTML Query DateSectionQuery Slot (Aff (AppEffects eff))
+  render :: State -> H.ParentHTML Query DateSectionQuery Slot Futbol
   render state =
     HH.div
       [ HP.class_ $ wrap "Parent-container" ]
       [
         HH.h1_ [ HH.text "Fixtures" ]
-      , HH.div_
-          case state.date of
-            Nothing -> [HH.text  "No date loaded"]
-            (Just d) -> [HH.text ("date: " <> (either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d))]
-      , HH.div_
-          case state.selectedDate of
-            Nothing -> [HH.text "No date selected"]
-            (Just d) -> [HH.text ("selected date: " <>(either (\err -> "Error parsing date: " <> err) id $ formatDateTime "ddd MMM D" d))]
-      , HH.text (if state.loading then "Working..." else "")
-      , HH.slot (DateSectionSlot) dateSection (state.result) (HE.input HandleDateSectionMessage)
-      , HH.div_
-          case length $ state.result of
-          0 ->
-            [ HH.div_ [HH.text "No Fixtures"]]
-          _ ->
-            [HH.ul_ (map fixtureComponent (filterFixturesByDate (unsafePartial $ fromJust $ state.selectedDate) state.result))]
+      , HH.h1_ [ HH.text "Fixtures" ]
+
       ]
 
-  eval :: Query ~> H.ParentDSL State Query DateSectionQuery Slot Void (Aff (AppEffects eff))
+  eval :: Query ~> H.ParentDSL State Query DateSectionQuery Slot Void Futbol
   eval = case _ of
     Initialize next -> do
-      H.liftAff $ log "Initialize Root"
+      _ <- pure $ log "Initialize Root"
       -- TODO: use state monad to pass around configuration
-      H.modify (_ { loading = true })
-      currentTime <- DTI.toDateTime <$> (H.liftEff now)
-      H.modify (_ {date = Just currentTime})
-      -- H.liftAff $ log $ show currentTime
-      parsedWithFormatter <- pure $ unformat extendedDateTimeFormatInUTC "2017-08-12T14:00:00Z"
-      H.liftAff $ log $ show $ parsedWithFormatter
-      noice <- H.liftAff $ AX.affjax $ AX.defaultRequest { url = "http://api.football-data.org/v1/competitions/445/teams", method = Left GET, headers = [(RequestHeader "X-Auth-Token" "use reader here!")] }
-      H.liftAff $ log noice.response
-      -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
-      -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
-      response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
-      -- H.liftAff $ log response.response
-      let receiveFixtures (Right x) = do
-            filteredDates <- pure $ fixtureDates x
-            uniqueDates <- pure $ nub $ (map (modifyTime zeroOutTime) filteredDates)
-            cd <- pure $ snd $ unsafePartial $ fromJust $ closestDate currentTime uniqueDates
-            H.liftAff $ log $ "closest:" <> ( show $ closestDate currentTime uniqueDates )
-            H.modify (_ { loading = false, result = x, selectedDate = Just cd })
-          receiveFixtures (Left err) = do
-            H.liftAff $ log err
-            H.modify (_ { loading = false, result = [] })
-      fixtures <- pure $ jsonParser response.response >>= decodeJson
-      receiveFixtures $ fixtures
+      -- H.modify (_ { loading = true })
+      -- currentTime <- DTI.toDateTime <$> (H.liftEff now)
+      -- H.modify (_ {date = Just currentTime})
+      -- -- H.liftAff $ log $ show currentTime
+      -- parsedWithFormatter <- pure $ unformat extendedDateTimeFormatInUTC "2017-08-12T14:00:00Z"
+      -- H.liftAff $ log $ show $ parsedWithFormatter
+      -- noice <- H.liftAff $ AX.affjax $ AX.defaultRequest { url = "http://api.football-data.org/v1/competitions/445/teams", method = Left GET, headers = [(RequestHeader "X-Auth-Token" "2b5fa52045f74d1899c7be9bb2cbf6f0")] }
+      -- H.liftAff $ log noice.response
+      -- -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
+      -- -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
+      -- response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
+      -- -- H.liftAff $ log response.response
+      -- let receiveFixtures (Right x) = do
+      --       filteredDates <- pure $ fixtureDates x
+      --       uniqueDates <- pure $ nub $ (map (modifyTime zeroOutTime) filteredDates)
+      --       cd <- pure $ snd $ unsafePartial $ fromJust $ closestDate currentTime uniqueDates
+      --       H.liftAff $ log $ "closest:" <> ( show $ closestDate currentTime uniqueDates )
+      --       H.modify (_ { loading = false, result = x, selectedDate = Just cd })
+      --     receiveFixtures (Left err) = do
+      --       H.liftAff $ log err
+      --       H.modify (_ { loading = false, result = [] })
+      -- fixtures <- pure $ jsonParser response.response >>= decodeJson
+      -- receiveFixtures $ fixtures
       pure next
     Finalize next -> do
       pure next
     HandleDateSectionMessage msg next -> do
       case msg of
         NotifyDateSelect d -> do
-          H.liftAff $ log $ show $ d
+          _ <-  pure $ log $ show $ d
           H.modify (_ { selectedDate = Just d })
       pure next
 

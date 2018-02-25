@@ -13,12 +13,12 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console as C
 import Control.Monad.Eff.Now (now, NOW)
+import Control.Monad.Free (liftF)
 import DOM (DOM)
 import Data.Argonaut.Decode.Class (class DecodeJson, decodeJson)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array (filter, filterA, head, length, nub, reverse, snoc, sortBy, zip)
 import Data.Bifunctor (lmap)
-import Data.Combinators (on)
 import Data.DateTime (DateTime(..), date, diff, millisecond, modifyTime)
 import Data.DateTime.Instant as DTI
 import Data.Either (Either(Right, Left), either)
@@ -46,7 +46,7 @@ import Math (abs)
 import Network.HTTP.Affjax as AX
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Partial.Unsafe (unsafePartial)
-import Control.Monad.Free (liftF)
+import Control.Monad.Reader (ask)
 
 data Slot = DateSectionSlot
 derive instance eqDateSectionSlot :: Eq Slot
@@ -92,20 +92,23 @@ ui = H.lifecycleParentComponent
   eval :: Query ~> H.ParentDSL State Query DateSectionQuery Slot Void Futbol
   eval = case _ of
     Initialize next -> do
-      _ <- pure $ log "Initialize Root"
+      H.liftAff $ log "Initialize Root"
+      answer <- ask
+      H.liftAff $ log $ show $ answer
       -- TODO: use state monad to pass around configuration
       -- H.modify (_ { loading = true })
       -- currentTime <- DTI.toDateTime <$> (H.liftEff now)
       -- H.modify (_ {date = Just currentTime})
-      -- -- H.liftAff $ log $ show currentTime
+      -- H.liftAff $ log $ show currentTime
       -- parsedWithFormatter <- pure $ unformat extendedDateTimeFormatInUTC "2017-08-12T14:00:00Z"
       -- H.liftAff $ log $ show $ parsedWithFormatter
       -- noice <- H.liftAff $ AX.affjax $ AX.defaultRequest { url = "http://api.football-data.org/v1/competitions/445/teams", method = Left GET, headers = [(RequestHeader "X-Auth-Token" "2b5fa52045f74d1899c7be9bb2cbf6f0")] }
       -- H.liftAff $ log noice.response
+      
       -- -- testTime <- H.liftEff $ JSD.parse  "2017-08-12T14:00:00Z"
       -- -- H.liftAff $ log $ show $ date $ unsafePartial $ fromJust $ JSD.toDateTime testTime
       -- response <- H.liftAff $ AX.get ("http://localhost:8080/competitions/445/fixtures")
-      -- -- H.liftAff $ log response.response
+      -- H.liftAff $ log response.response
       -- let receiveFixtures (Right x) = do
       --       filteredDates <- pure $ fixtureDates x
       --       uniqueDates <- pure $ nub $ (map (modifyTime zeroOutTime) filteredDates)
@@ -157,10 +160,10 @@ closestDate :: DateTime -> Array DateTime -> Maybe DiffDate
 closestDate givenDate [] = Nothing
 closestDate givenDate xs = head s where
                            s :: Array DiffDate
-                           s = mySort $ filter (\x -> fst x >= Milliseconds 0.0) $ (map (\x -> getDiffDate givenDate x) xs)
+                           s = filter (\x -> fst x >= Milliseconds 0.0) $ (map (\x -> getDiffDate givenDate x) xs)
 
 -- mySort :: forall b. Ord b => [(a, b)] -> [(a, b)]
-mySort = sortBy (compare `on` fst)
+-- mySort = sortBy (compare `on` fst)
 
 absMilliseconds :: Milliseconds -> Milliseconds
 absMilliseconds = over Milliseconds abs
